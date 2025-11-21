@@ -1,245 +1,231 @@
-# Gerassic Organ – Technical Documentation
-**Version:** Based on commit `d98319451b52165d5c0c8d84ce281333d11cbb31`  
-**Author:** jlmitch5  
+# Gerassic Organ (KiCad Remake)
 
-The **Gerassic Organ** is a CMOS-based synthesizer voice inspired by Peter Blasser’s instruments, extended with:
-
-- Voltage-controlled pitch using a **2164 VCA as a voltage-controlled resistor (VCR)**  
-- Bias-controlled decay, timbre, and “growl” behavior  
-- Buffered bias supply for improved tuning stability  
-- Compatibility with banana or 3.5 mm jack CV workflows  
-- Preservation of original idiosyncratic behavior and tone  
-
-This document explains the function of the circuit, design corrections, tuning notes, and how to interpret the KiCad project.
+A modern, documented, KiCad-based recreation and extension of the **Gerassic Organ** CMOS synth voice.  
+This repository contains the full schematic and PCB files, along with corrections, improvements, and an optional 2164-based pitch control input.
 
 ---
 
-## 1. Repository Overview
-
-This repository contains:
-
-- **KiCad project files**  
-- **Schematic (`*.kicad_sch`) and PCB (`*.kicad_pcb`)**  
-- **Supporting library files**  
-- This README.md as the **primary design documentation**
-
----
-
-## 2. Schematic Overview
-
-> **Note:** Export your schematics as PNG/SVG and replace the URLs below with the correct GitHub links.
-
-### 2.1 Main Schematic
-```
-
-![Main Schematic](https://github.com/jlmitch5/gerassic_organ_kicad/blob/d98319451b52165d5c0c8d84ce281333d11cbb31/<ADD_SCHEMATIC_FILE>)
-
-```
-
-### 2.2 Oscillator (Integrator + Schmitt Trigger)
-```
-
-![Oscillator](https://github.com/jlmitch5/gerassic_organ_kicad/blob/d98319451b52165d5c0c8d84ce281333d11cbb31/<ADD_SCHEMATIC_FILE>)
-
-```
-
-### 2.3 2164 Voltage-Controlled Resistor (Pitch Control)
-```
-
-![2164 VCR](https://github.com/jlmitch5/gerassic_organ_kicad/blob/d98319451b52165d5c0c8d84ce281333d11cbb31/<ADD_SCHEMATIC_FILE>)
-
-```
-
-### 2.4 Bias Supply + Buffer
-```
-
-![Bias Buffer](https://github.com/jlmitch5/gerassic_organ_kicad/blob/d98319451b52165d5c0c8d84ce281333d11cbb31/<ADD_SCHEMATIC_FILE>)
-
-```
-
-### 2.5 Pitch CV and Decay CV Inputs
-```
-
-![CV Inputs](https://github.com/jlmitch5/gerassic_organ_kicad/blob/d98319451b52165d5c0c8d84ce281333d11cbb31/<ADD_SCHEMATIC_FILE>)
-
-```
+## Table of Contents
+1. [Overview](#overview)  
+2. [Block Diagram](#block-diagram)  
+3. [Power & Biasing](#power--biasing)  
+4. [Integrator Core](#integrator-core)  
+5. [Schmitt Trigger & Reset Path](#schmitt-trigger--reset-path)  
+6. [4067 Selector](#4067-selector)  
+7. [2164-Based Pitch CV Input](#2164-based-pitch-cv-input)  
+8. [Bias Buffering](#bias-buffering)  
+9. [Known Behaviors & Tuning Considerations](#known-behaviors--tuning-considerations)  
+10. [Parts Notes / SMD Equivalents](#parts-notes--smd-equivalents)  
+11. [Schematic](#schematic)
 
 ---
 
-## 3. Functional Description
+## Overview
 
-### 3.1 CMOS Relaxation Oscillator
-The core of the instrument is a CMOS-based relaxation oscillator:
+This project recreates the **Gerassic Organ** with the following goals:
 
-- An **integrator** ramps voltage up  
-- A **comparator/Schmitt trigger** flips state at thresholds  
-- A **transistor** discharges the timing capacitor  
-- Oscillation frequency is set by the **current into the timing capacitor**
+- Preserve the original sonic character  
+- Correct wiring inconsistencies from earlier versions  
+- Add optional **V/Oct-style pitch control** using a **SSM2164/V2164**  
+- Allow banana or 3.5 mm jacks  
+- Provide modern KiCad files for community development
 
-The innovation here is replacing fixed resistors with a **2164 VCA used as a voltage-controlled resistor**.
+The README focuses only on the **final, corrected engineering implementation**.
 
 ---
 
-### 3.2 2164 as a Voltage-Controlled Resistor (VCR)
-
-The 2164 sinks current exponentially with respect to its control voltage:
+## Block Diagram
 
 ```
 
-I_out = I_in * 2^(-(V_control - 0V) / 33mV)
+Keyboard → 4067 Selector → Integrator → Schmitt Trigger → Transistor Reset → Integrator
+↑
+│ (optional)
+2164 Pitch CV
 
-```
-
-In this circuit:
-
-- 2164 **GND pin sits at Vbias (~4.1–4.5 V)**  
-- 2164 **Vee = GND**, **Vcc = +9 V**  
-- Pitch CV is scaled into the 2164’s required control range: **4.5–6 V**  
-
-This gives:
-
-- Smooth exponential pitch response  
-- Limited V/oct range (sufficient for musical play)  
-- Characterful nonlinearities at extremes
+````
 
 ---
 
-### 3.3 Bias Supply and Buffering
+## Power & Biasing
 
-A bias voltage (~4.1 V) forms the reference point for:
+The system runs on a **single +9V supply**.
 
-- Oscillator comparators  
-- CV scaling  
-- 2164 ground reference  
+### Bias Voltages
+- **VBias (~4.5V)** is used extensively throughout the circuit.  
+- The original design relied on VBias sagging and interacting across subcircuits.  
+- This remake **buffers VBias** to stabilize operation, particularly with the 2164.
 
-Originally this bias drooped during button presses, causing pitch instability.  
-A dedicated **op-amp buffer** now stabilizes bias while retaining the original tone.
+### 2164 Supply (Single-Supply Mode)
 
----
+Per Pichenettes’ notes:
 
-### 3.4 Pitch CV Input
+- 2164 **Vcc = +9V**
+- 2164 **Vee = GND**
+- 2164 **GND pin receives VBias** (used as the internal reference)
 
-Pitch CV enters through an inverting op-amp stage scaled to the 2164’s 4.5–6 V control range.
-
-Design notes:
-
-- Rail-to-rail op-amps are recommended for accurate low-voltage operation  
-- 100k input impedance keeps banana-jack behavior stable  
-- Can be adapted to Eurorack (±5 V) with minor scaling changes
+This allows the 2164 to operate correctly from a single supply.
 
 ---
 
-### 3.5 Decay / X-Resistor Control
+## Integrator Core
 
-The “X-resistor” node affects:
+The integrator is the heart of the Gerassic Organ tone generator.
 
-- Decay time  
-- Droning behavior  
-- Harmonic content
+### ✔ Corrected Pin Connections (Important)
 
-Because the decay control operates by pushing current into a floating node, pots **interact** in nonlinear and musically expressive ways.
+- **C5/C6/C7** connect **between pin 6 and pin 7** of the op-amp.  
+  *These are part of the feedback loop, not tied to ground or Z.*
 
-Improvement:
+- **Pin 5** connects **only to VBias**.
 
-- Replace the LM358 with a **rail-to-rail op-amp** for full 9 V swing  
-- Remove unnecessary inversion stages and stray trimmers  
-- Follow the 2164-style current-source topology for clean CV control
+- **R25** connects to **pin 7**.
 
----
-
-## 4. Full List of Design Corrections
-
-### Oscillator Section
-- Feedback capacitor must be wired **strictly across op-amp pins 6 and 7**  
-- Pin 5 connects **only to Vbias**  
-- Comparator input must not be tied to other nodes  
-- R25 terminates at the correct op-amp pin after correction
-
-### R26 / R32 Divider
-Correct divider:
-
-```
-
-U3B output → R26 → node → R32 → GND
-
-```
-
-The node drives the base of the discharge transistor.
-
-### 2164 Wiring
-- **GND pin → Vbias** (virtual ground)  
-- **Vee → GND**  
-- **Vcc → +9 V**  
-- Unused inputs/outputs grounded per datasheet  
-- Control voltage must remain **4.5–6.0 V**
-
-### Bias Supply
-- Bias must be **buffered**  
-- Prevents pitch shifts from transient current draw
-
-### CV Inputs
-- Prefer a single inverting gain stage  
-- Rail-to-rail op-amps recommended  
-- No unnecessary buffering
-
-### X-Resistor / Decay CV
-- LM358 replaced with rail-to-rail part  
-- Remove redundant inversion stage  
-- Remove unused trimmer (RV6)  
-- Interactive pot behavior is expected
-
-### V/Oct Considerations
-- Comparator introduces a constant timing error  
-- 2164 is temperature-sensitive  
-- Expect limited but usable V/oct range
+- The 2164-modified version injects current from the 2164 output to **pin 6**.
 
 ---
 
-## 5. Bill of Materials (Simplified)
+## Schmitt Trigger & Reset Path
 
-| Component | Description | Notes |
-|----------|-------------|-------|
-| 2164 VCA | Exponential VCR | Core of pitch control |
-| LM358 (replace) | Dual op-amp | Use rail-to-rail for CV sections |
-| TL07x | Audio op-amps | Integrator / comparator |
-| CD4067 | Analog mux | Check A0–A3 ordering |
-| BC547/BC557 | Transistors | SMD: BC846/BC856 equivalents |
-| Diodes | 1N4148 / 1N400x | Signal + power |
-| Resistors | 1% metal film | Standard values |
-| Capacitors | Electrolytic + film | Timing cap C3 may be switchable |
+The Schmitt trigger and transistor form the reset mechanism for the oscillator.
 
-Export a full BOM via KiCad as needed.
+### ✔ Corrected Wiring
+
+- **U3A pin 2** connects **only to pin 7** of the integrator op-amp.  
+- **R26/R32** form a divider from **U3B output** to the **transistor base**.  
+  - The divider must reference the **integrator output**, *not a current-carrying node*.
+- This ensures stable switching thresholds.
 
 ---
 
-## 6. Usage Notes
+## 4067 Selector
 
-### Power Requirements
-- +9 V supply  
-- GND  
-- Vbias internally generated and buffered
+The CD4067 selects which key (or CV level) feeds the integrator.
 
-### Calibration
-- Tune V/oct trimmer  
-- Select suitable timing capacitor values  
-- Expect temperature influence on tuning (due to 2164 exponential cell)
+### ✔ Correction Applied
 
-### Patch Notes
-- Works with banana or 3.5 mm jacks  
-- Inputs are high-impedance  
-- Bias buffering prevents cross-interference between controls
+- Connection to **A3** was missing in earlier drafts — now restored.
 
 ---
 
-## 7. Files
+## 2164-Based Pitch CV Input
 
-KiCad project and schematics:  
-https://github.com/jlmitch5/gerassic_organ_kicad/tree/d98319451b52165d5c0c8d84ce281333d11cbb31
+The project adds an optional **pitch CV input**, following the principles used in Mutable Instruments’ *Ripples* and *Anushri*.
+
+### How it works:
+
+- **2164 input (Z)** receives a current proportional to the desired pitch.  
+- **2164 output** goes directly to **pin 6 of the integrator**.  
+  - This effectively creates a **variable current source** controlling frequency.
+
+### ✔ Interpreting “Pin 6 connected to Z”
+Correct interpretation:
+
+- The 2164 allows a **variable amount of current** between Z and pin 6.  
+- It does **not** connect pin 6 *directly* to Z electrically.  
+- You are modulating the integrator’s charging current.
+
+### CV Range
+
+- Target: **0V → +9V control** works fine for banana-style workflows.  
+- Eurorack ±5 V can be adapted using a simple offset circuit.
+
+### 2164 Control Voltage Requirements
+
+- VC must vary from **~4.5V (max current)** to **~6.0V (−9 octaves)**.  
+- This is why VBias must be stable (buffered).
 
 ---
 
-## 8. Revision History
+## Bias Buffering
 
-| Version | Changes |
-|---------|---------|
-| v1.0 | Initial full documentation in README.md |
+VBias feeds:
+
+- 2164 reference pins  
+- Integrator reference  
+- Several comparator thresholds
+
+### ✔ Final Recommendation
+
+- Use a **rail-to-rail op-amp** when buffering VBias or CV inputs.
+- LM358 is fine for most of the circuit, but note:
+  - Its output **cannot reach the positive rail**.
+  - So buffers may top out ~1V below +9V.
+
+---
+
+## Known Behaviors & Tuning Considerations
+
+Several behaviors are inherent to the integrator + Schmitt structure:
+
+### 1. Switching-Time Constant Term
+At higher frequencies, the Schmitt trigger introduces a “constant time” that affects pitch.  
+A small offset current into the integrator can compensate for this.
+
+### 2. 2164 Non-Idealities
+- Slight temperature dependence  
+- Slight deviation from perfect exponential behavior  
+
+Pichenettes references the **Anushri page 3** technique of scaling the CV by a temperature-dependent factor for improved stability.  
+This design keeps things simpler and omits this compensation.
+
+### 3. Buffered VBias Effect on Tone  
+Buffering VBias removes some of the original circuit’s “wobbly coupling,” slightly changing the tone — but keeping the 2164 stable.
+
+### 4. Decay/X-Resistor Experiments
+- LM358 limit near +9V explains loss of dynamic range in certain configurations.
+- Simple non-inverting buffers work best.
+- Variable resistance + variable bias creates many interesting behaviors (infinite drones, phantom notes, etc).
+
+---
+
+## Parts Notes / SMD Equivalents
+
+### Op-amps
+- **LM358** (single supply, low-end, non-rail-to-rail output)
+- **TL072 / TL07x** (dual supply preferred; watch for input swing limitations)
+
+For SMD:
+- LM358 → **LM358DR**, **LM358DT**  
+- TL072 → **TL072CDR**, etc.
+
+For full rail-to-rail behavior (recommended for CV inputs & buffers):
+- **OPA1678**
+- **OPA2134**
+- **MCP6002** (budget)
+
+### Transistors
+- 2N547/2N557 → SOT-23 equivalents: **MMBT3904 / MMBT3906**
+
+### Diodes
+- 1N4148 → **1N4148W (SMD)**  
+- Power: 1N4007 → **1N4007FL**
+
+Resistors and capacitors translate directly to 0603/0805 packages.
+
+---
+
+## Schematic
+
+Images omitted for now, but the README includes the section:
+
+```markdown
+<!--
+### Schematic Overview
+![Main Schematic](docs/img/schematic.png)
+-->
+````
+
+You can uncomment once you add exported schematic images.
+
+---
+
+## License
+
+Open-source hardware; license included in repo.
+
+---
+
+## Contributions
+
+PRs welcome for layout improvements, alternative 2164 CV converters, documentation, and demonstrations.
